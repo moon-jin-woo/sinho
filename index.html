@@ -4,4 +4,38 @@
 const data=[['제1','07:35:15','07:33:20 꺼짐 · 07:35:15 켜짐 · 07:36:00 꺼짐'],['제2','07:37:50','07:37:50 켜짐'],['제3','07:39:55','07:39:55 켜짐'],['제4','07:37:15','07:37:15 켜짐']];
 const grid=document.querySelector('#grid');grid.innerHTML=data.map((s,i)=>'<section class="panel"><h2>'+s[0]+' 신호등</h2><small>기준 점등 '+s[1]+'</small><div class="stage"><div class="signal"><div class="lamp red" id="r'+i+'"></div><div class="lamp yellow"></div><div class="lamp green" id="g'+i+'"></div></div><div><div class="status" id="s'+i+'"></div><small id="l'+i+'"></small><div class="count" id="c'+i+'"></div></div></div><div class="note">관측: '+s[2]+'<p>녹색 45초 / 적색 115초 (가정 포함)</p></div></section>').join('');
 function tick(){const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(new Date());document.querySelector('#clock').textContent=parts+' KST';const t=parts.split(':').reduce((a,b)=>a*60+Number(b),0);data.forEach((d,i)=>{const base=d[1].split(':').reduce((a,b)=>a*60+Number(b),0);const p=((t-base)%160+160)%160;const green=p<45;const left=green?45-p:160-p;document.querySelector('#r'+i).classList.toggle('on',!green);document.querySelector('#g'+i).classList.toggle('on',green);document.querySelector('#s'+i).textContent=green?'녹색 점등':'적색 점등';document.querySelector('#s'+i).style.color=green?'#65f1a3':'#ff777b';document.querySelector('#l'+i).textContent=green?'적색 전환까지':'녹색 전환까지';document.querySelector('#c'+i).textContent=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0')})}tick();setInterval(tick,500);
+</script>
+<style>
+.measure{margin:16px;padding:22px;background:#19273b;border:1px solid #35475f;border-radius:18px}.measure h2{margin:0 0 8px}.capture-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}.capture{background:#101c2d;border-radius:14px;padding:16px}.capture h3{margin:0 0 12px}.capture button,.actions button{cursor:pointer;border:0;border-radius:10px;padding:13px 16px;font-weight:700;font-size:16px;color:white;background:#2866a7;margin:3px}.capture button.off{background:#b64248}.capture button.on{background:#19845a}.capture button:active{transform:scale(.98)}.capture .last{color:#c2d1e5;font-variant-numeric:tabular-nums;margin:10px 0}.actions{display:flex;flex-wrap:wrap;gap:8px}.actions button{background:#40546b;font-size:14px}.records{overflow:auto;max-height:360px;margin-top:16px}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{text-align:left;border-bottom:1px solid #35475f;padding:10px;white-space:nowrap}th{position:sticky;top:0;background:#19273b}.summary{color:#b6d3ed;font-size:14px;line-height:1.8}.warning{color:#ffd28c}@media(max-width:650px){.capture-grid{grid-template-columns:1fr}.measure{margin:12px;padding:16px}.capture button{min-height:52px}}
+</style>
+<section class="measure" aria-labelledby="measure-title"><h2 id="measure-title">실측 데이터 수집</h2><p class="summary">실제 신호가 바뀌는 순간 해당 버튼을 누르십시오. 클릭 시각을 <b>0.001초(밀리초) 단위</b>로 기록합니다. 화면 상단 신호등은 예측 시뮬레이션이며 실측 기록과 별개입니다.</p><div class="capture-grid" id="captures"></div><div class="actions"><button id="export">CSV 내보내기</button><button id="undo">마지막 기록 취소</button><button id="clear">전체 기록 삭제</button></div><p class="summary" id="summary"></p><p class="summary warning">브라우저 시계 및 클릭 반응시간 때문에 1ms 단위로 표시되더라도 실제 측정 정확도가 ±1ms라는 뜻은 아닙니다. 기록은 현재 브라우저에만 저장되므로 CSV로 정기적으로 백업하십시오.</p><div class="records"><table><thead><tr><th>번호</th><th>신호등</th><th>상태</th><th>측정시각 (KST)</th><th>직전 동일 신호등 이벤트와 간격</th></tr></thead><tbody id="records"></tbody></table></div></section>
+<script>
+(()=>{
+const key='sinho-measurements-v1';
+let records=[];
+try{const saved=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(saved))records=saved.filter(x=>Number.isFinite(x.t)&&Number.isInteger(x.i)&&x.i>=0&&x.i<4&&['켜짐','꺼짐'].includes(x.state));}catch(e){}
+const fmt=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+const stamp=t=>fmt.format(new Date(t))+'.'+String(Math.floor(t%1000)).padStart(3,'0');
+const capture=document.querySelector('#captures');
+capture.innerHTML=Array.from({length:4},(_,i)=>'<div class="capture"><h3>제'+(i+1)+' 신호등</h3><button class="on" data-i="'+i+'" data-state="켜짐">● 켜짐 기록</button><button class="off" data-i="'+i+'" data-state="꺼짐">● 꺼짐 기록</button><div class="last" id="last'+i+'">기록 없음</div><div class="summary" id="stats'+i+'"></div></div>').join('');
+function save(){try{localStorage.setItem(key,JSON.stringify(records));}catch(e){alert('저장 공간이 부족하거나 차단되어 있습니다. CSV로 백업하십시오.');}}
+function avg(a){return a.length?(a.reduce((s,x)=>s+x,0)/a.length/1000).toFixed(3)+'초':'자료 부족';}
+function render(){
+for(let i=0;i<4;i++){
+const a=records.filter(x=>x.i===i).sort((x,y)=>x.t-y.t);
+const last=a.at(-1);document.querySelector('#last'+i).textContent=last?stamp(last.t)+' · '+last.state:'기록 없음';
+const periods=[];const green=[];const red=[];
+for(let j=1;j<a.length;j++){const dt=a[j].t-a[j-1].t;if(dt<=0)continue;if(a[j].state===a[j-1].state)periods.push(dt);else if(a[j-1].state==='켜짐')green.push(dt);else red.push(dt);}
+document.querySelector('#stats'+i).textContent='관측 '+a.length+'건 · 동일 상태 간격 평균 '+avg(periods)+' · 켜짐 지속 평균 '+avg(green)+' · 꺼짐 지속 평균 '+avg(red);
+}
+document.querySelector('#summary').textContent='전체 '+records.length+'건 · 측정값은 이 기기의 브라우저에 자동 저장됩니다.';
+const body=document.querySelector('#records');body.replaceChildren();
+records.slice().reverse().forEach((r,k)=>{const prior=records.slice(0,records.length-1-k).reverse().find(x=>x.i===r.i);const tr=document.createElement('tr');[String(records.length-k),'제'+(r.i+1),r.state,stamp(r.t),prior?((r.t-prior.t)/1000).toFixed(3)+'초':'—'].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.append(td)});body.append(tr)});
+}
+capture.addEventListener('click',e=>{const b=e.target.closest('button[data-i]');if(!b)return;const t=Date.now();records.push({i:Number(b.dataset.i),state:b.dataset.state,t});save();render();});
+document.querySelector('#undo').onclick=()=>{if(!records.length)return;records.pop();save();render();};
+document.querySelector('#clear').onclick=()=>{if(confirm('모든 측정 기록을 삭제하시겠습니까? 삭제 전 CSV 백업을 권장합니다.')){records=[];save();render();}};
+document.querySelector('#export').onclick=()=>{const lines=[['signal','state','timestamp_kst','epoch_ms'],...records.map(r=>[r.i+1,r.state,stamp(r.t),r.t])];const csv='\uFEFF'+lines.map(a=>a.join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='sinho-measurements-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+render();
+})();
 </script></html>
