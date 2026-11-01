@@ -1,47 +1,66 @@
 <!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>4구역 신호등</title><style>
 *{box-sizing:border-box}body{margin:0;background:#0b1220;color:#f2f5ff;font-family:system-ui,sans-serif}header{padding:22px;background:#172438}h1{margin:0;font-size:26px}small{color:#a8bdd2}#clock{font-size:22px;float:right}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:16px}.panel{background:#19273b;border:1px solid #35475f;border-radius:18px;padding:22px}h2{margin-top:0}.stage{display:flex;align-items:center;justify-content:center;gap:40px;margin:20px 0}.signal{background:linear-gradient(90deg,#12161c,#29313b,#11161c);border:7px solid #414b57;border-radius:25px;padding:12px;display:grid;gap:10px;box-shadow:8px 12px 20px #0006}.lamp{width:72px;height:72px;border-radius:50%;background:#242a32;border:5px solid #090c12;box-shadow:inset 0 6px 13px #000b}.red.on{background:#ff3a45;box-shadow:0 0 24px #f44550aa}.green.on{background:#30eb81;box-shadow:0 0 24px #30eb81aa}.yellow.on{background:#ffcd35;box-shadow:0 0 24px #ffcd35aa}.status{font-weight:bold;font-size:22px}.count{font-size:32px;font-variant-numeric:tabular-nums}.note,footer{color:#b1c0d4;font-size:13px;line-height:1.7}footer{padding:8px 24px 24px}@media(max-width:650px){.grid{grid-template-columns:1fr}.stage{gap:22px}#clock{float:none}}
-</style><header><span id="clock"></span><h1>교통신호 관측 대시보드</h1><small>4개 구역 · 09시 이전 160초 / 이후 150초 · 한국 표준시</small></header><main class="grid" id="grid"></main><footer>※ 관측 자료를 바탕으로 한 시뮬레이션입니다. 제1 신호등 이외의 녹색 지속시간과 09시 전후의 반복주기·위상 전환 방식은 검증되지 않았습니다. 황색 지속시간은 미상으로 표시하지 않습니다. 실제 도로 횡단 판단에 사용하지 마십시오.</footer><script>
-const data=[
- ['제1','07:35:15','07:33:20 꺼짐 · 07:35:15 켜짐 · 07:36:00 꺼짐'],
- ['제2','07:37:50','07:37:50 켜짐'],
- ['제3','07:39:55','07:39:55 켜짐'],
- ['제4','07:37:15','07:37:15 켜짐']
+</style><header><span id="clock"></span><h1>교통신호 관측 대시보드</h1><small>11/02 아침 실측 · 09시 이전 160초 / 이후 150초 · 한국 표준시</small></header><main class="grid" id="grid"></main><footer>※ 관측 자료를 바탕으로 한 시뮬레이션입니다. 4개 신호등의 녹색 지속시간은 11월 2일 오전 1회씩 측정했습니다. 주기와 09시 전환 방식, 날짜별 위상 반복은 검증되지 않았습니다. 황색 지속시간은 미상으로 표시하지 않습니다. 실제 도로 횡단 판단에 사용하지 마십시오.</footer><script>
+'use strict';
+// Morning observations: 2026-11-02, Asia/Seoul (KST).
+// The previous morning anchors are retained only to display independent residuals.
+const signals=[
+ {name:'제1',on:'07:21:56.516',off:'07:22:40.491',duration:43.975,oldOn:'07:35:15',residual:1.516},
+ {name:'제2',on:'07:24:30.195',off:'07:24:54.431',duration:24.236,oldOn:'07:37:50',residual:0.195},
+ {name:'제3',on:'07:23:57.764',off:'07:24:21.529',duration:23.765,oldOn:'07:39:55',residual:2.764},
+ {name:'제4',on:'07:26:36.496',off:'07:27:00.031',duration:23.535,oldOn:'07:37:15',residual:1.496}
 ];
 const grid=document.querySelector('#grid');
-grid.innerHTML=data.map((s,i)=>'<section class="panel"><h2>'+s[0]+' 신호등</h2><small id="base'+i+'">아침 기준 '+s[1]+'</small><div class="stage"><div class="signal"><div class="lamp red" id="r'+i+'"></div><div class="lamp yellow"></div><div class="lamp green" id="g'+i+'"></div></div><div><div class="status" id="s'+i+'"></div><small id="l'+i+'"></small><div class="count" id="c'+i+'"></div></div></div><div class="note">아침 관측: '+s[2]+'<p id="duration'+i+'"></p></div></section>').join('');
-const mode=document.createElement('section'); mode.className='measure';mode.style.marginBottom='0';
-mode.innerHTML='<h2>아침 관측 기반 2단계 주기 모델</h2><p class="summary" id="model-note">09:00 이전 160초 · 09:00 이후 150초. 오전 9시 전환 시각과 위상 연속성은 가정이며, 10시대·저녁 실측은 모델 산정에서 제외했습니다.</p>';
+grid.innerHTML=signals.map((s,i)=>'<section class="panel"><h2>'+s.name+' 신호등</h2><small id="base'+i+'"></small><div class="stage"><div class="signal"><div class="lamp red" id="r'+i+'"></div><div class="lamp yellow"></div><div class="lamp green" id="g'+i+'"></div></div><div><div class="status" id="s'+i+'"></div><small id="l'+i+'"></small><div class="count" id="c'+i+'"></div><small id="next'+i+'"></small></div></div><div class="note">2026-11-02 실측: '+s.on+' 점등 / '+s.off+' 소등<p id="duration'+i+'"></p></div></section>').join('');
+const mode=document.createElement('section');
+mode.className='measure';
+mode.style.marginBottom='0';
+mode.innerHTML='<h2>11월 2일 아침 실측 기반 모델</h2><p class="summary" id="model-note">09:00 이전 160초 · 09:00 이후 150초 · 시간대 전환 시 마지막 160초 주기의 점등 위상을 이어받습니다. 매일 같은 아침 위상이 반복된다는 가정이며, 09시 전환 방식과 150초 주기는 미검증입니다.</p><div class="records"><table><thead><tr><th>신호등</th><th>실측 점등</th><th>실측 소등</th><th>녹색 지속</th><th>종전 아침 모델 오차</th></tr></thead><tbody>'+signals.map(s=>'<tr><td>'+s.name+'</td><td>'+s.on+'</td><td>'+s.off+'</td><td>'+s.duration.toFixed(3)+'초</td><td>+'+s.residual.toFixed(3)+'초</td></tr>').join('')+'</tbody></table></div>';
 grid.before(mode);
 const fmtTime=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
 function seconds(s){const a=s.split(':').map(Number);return a[0]*3600+a[1]*60+a[2];}
-function positiveMod(a,b){return ((a%b)+b)%b;}
+function timeLabel(sec){
+ const ms=((Math.round(sec*1000)%86400000)+86400000)%86400000;
+ const h=Math.floor(ms/3600000),m=Math.floor(ms/60000)%60,s=Math.floor(ms/1000)%60,rem=ms%1000;
+ return [h,m,s].map(x=>String(x).padStart(2,'0')).join(':')+'.'+String(rem).padStart(3,'0');
+}
+function prediction(timeSec,signal){
+ const morningAnchor=seconds(signal.on);
+ const boundary=9*3600;
+ let lastOn,period,phase;
+ if(timeSec<boundary){
+   period=160;
+   lastOn=morningAnchor+Math.floor((timeSec-morningAnchor)/period)*period;
+ }else{
+   period=150;
+   // The last start BEFORE 09:00 is retained; subsequent starts use 150 seconds.
+   const lastMorning=morningAnchor+Math.floor((boundary-morningAnchor)/160)*160;
+   lastOn=lastMorning+Math.floor((timeSec-lastMorning)/period)*period;
+ }
+ phase=timeSec-lastOn;
+ const green=phase<signal.duration;
+ return {period,lastOn,phase,green,nextOn:lastOn+period,nextOff:lastOn+signal.duration,remaining:green?signal.duration-phase:lastOn+period-timeSec};
+}
 function tick(){
- const now=new Date();const parts=fmtTime.format(now);
- document.querySelector('#clock').textContent=parts+' KST';
+ const now=new Date();
+ const parts=fmtTime.format(now);
  const t=seconds(parts)+now.getMilliseconds()/1000;
- data.forEach((d,i)=>{
-   const anchor=seconds(d[1]);const morningPeriod=160,dayPeriod=150,change=9*3600;
-   // Continue from the last scheduled 160-second onset at or before 09:00.
-   const lastBeforeChange=anchor+Math.floor((change-anchor)/morningPeriod)*morningPeriod;
-   const afterChange=t>=change;
-   const period=afterChange?dayPeriod:morningPeriod;
-   const base=afterChange?lastBeforeChange:anchor;
-   const p=positiveMod(t-base,period);
-   // Signal 1 green duration was observed as 45s in the morning; other durations are provisional.
-   const duration=45;
-   const green=p<duration;
-   const left=green?duration-p:period-p;
-   document.querySelector('#r'+i).classList.toggle('on',!green);
-   document.querySelector('#g'+i).classList.toggle('on',green);
-   document.querySelector('#s'+i).textContent=green?'녹색 점등 (예측)':'적색 점등 (예측)';
-   document.querySelector('#s'+i).style.color=green?'#65f1a3':'#ff777b';
-   document.querySelector('#l'+i).textContent=green?'적색 전환까지':'녹색 전환까지';
-   document.querySelector('#c'+i).textContent=left.toFixed(1)+'초';
-   document.querySelector('#base'+i).textContent='아침 기준 '+d[1]+' · '+(afterChange?'09:00 이후 150초':'09:00 이전 160초');
-   document.querySelector('#duration'+i).textContent='녹색 45초 '+(i===0?'(아침 관측)':'(미검증 가정)')+' / 주기 '+period+'초 (가정)';
+ document.querySelector('#clock').textContent=parts+' KST';
+ signals.forEach((s,i)=>{
+   const p=prediction(t,s);
+   document.querySelector('#r'+i).classList.toggle('on',!p.green);
+   document.querySelector('#g'+i).classList.toggle('on',p.green);
+   document.querySelector('#s'+i).textContent=p.green?'녹색 점등 (예측)':'적색 점등 (예측)';
+   document.querySelector('#s'+i).style.color=p.green?'#65f1a3':'#ff777b';
+   document.querySelector('#l'+i).textContent=p.green?'녹색 소등까지':'녹색 점등까지';
+   document.querySelector('#c'+i).textContent=p.remaining.toFixed(1)+'초';
+   document.querySelector('#next'+i).textContent=(p.green?'예상 소등 ':'예상 점등 ')+timeLabel(p.green?p.nextOff:p.nextOn);
+   document.querySelector('#base'+i).textContent='11/02 아침 기준 '+s.on+' · '+(t<32400?'09시 이전':'09시 이후');
+   document.querySelector('#duration'+i).textContent='실측 녹색 '+s.duration.toFixed(3)+'초 / 설정 주기 '+p.period+'초';
  });
 }
-tick();setInterval(tick,100);
+tick();
+setInterval(tick,100);
 </script>
 <style>
 .measure{margin:16px;padding:22px;background:#19273b;border:1px solid #35475f;border-radius:18px}.measure h2{margin:0 0 8px}.capture-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}.capture{background:#101c2d;border-radius:14px;padding:16px}.capture h3{margin:0 0 12px}.capture button,.actions button{cursor:pointer;border:0;border-radius:10px;padding:13px 16px;font-weight:700;font-size:16px;color:white;background:#2866a7;margin:3px}.capture button.off{background:#b64248}.capture button.on{background:#19845a}.capture button:active{transform:scale(.98)}.capture .last{color:#c2d1e5;font-variant-numeric:tabular-nums;margin:10px 0}.actions{display:flex;flex-wrap:wrap;gap:8px}.actions button{background:#40546b;font-size:14px}.records{overflow:auto;max-height:360px;margin-top:16px}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{text-align:left;border-bottom:1px solid #35475f;padding:10px;white-space:nowrap}th{position:sticky;top:0;background:#19273b}.summary{color:#b6d3ed;font-size:14px;line-height:1.8}.warning{color:#ffd28c}@media(max-width:650px){.capture-grid{grid-template-columns:1fr}.measure{margin:12px;padding:16px}.capture button{min-height:52px}}
