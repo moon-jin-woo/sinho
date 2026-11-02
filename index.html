@@ -15,7 +15,7 @@ grid.innerHTML=signals.map((s,i)=>'<section class="panel"><h2>'+s.name+' 신호�
 const mode=document.createElement('section');
 mode.className='measure';
 mode.style.marginBottom='0';
-mode.innerHTML='<h2>11월 2일 아침 실측 기반 모델</h2><p class="summary" id="model-note">제1 신호등 (임시): 09:15 이전 160초 → 09:15~18:57 150초 → 18:57 이후 160초. 전환 시 기존 점등 위상을 이어받습니다. 제2~4 신호등은 종전 09:00 전환 설정을 유지합니다. 날짜별 위상·전환 시각은 아직 미검증입니다.</p><div class="records"><table><thead><tr><th>신호등</th><th>실측 점등</th><th>실측 소등</th><th>녹색 지속</th><th>종전 아침 모델 오차</th></tr></thead><tbody>'+signals.map(s=>'<tr><td>'+s.name+'</td><td>'+s.on+'</td><td>'+s.off+'</td><td>'+s.duration.toFixed(3)+'초</td><td>+'+s.residual.toFixed(3)+'초</td></tr>').join('')+'</tbody></table></div>';
+mode.innerHTML='<h2>11월 2일 아침 실측 기반 모델</h2><p class="summary" id="model-note">제1 신호등 (임시): 09:15 이전 160초 → 09:15~18:57 150초 → 18:57 이후 160초. 11월 2일 20:59경 보고된 약 1초 지연을 반영해 저녁 예측 위상만 1초 앞당겼습니다(정확한 실측 시각은 미확보). 제2~4 신호등은 기존 09:00 전환 설정을 유지합니다. 전환 시각과 날짜별 위상은 아직 미검증입니다.</p><div class="records"><table><thead><tr><th>신호등</th><th>실측 점등</th><th>실측 소등</th><th>녹색 지속</th><th>종전 아침 모델 오차</th></tr></thead><tbody>'+signals.map(s=>'<tr><td>'+s.name+'</td><td>'+s.on+'</td><td>'+s.off+'</td><td>'+s.duration.toFixed(3)+'초</td><td>+'+s.residual.toFixed(3)+'초</td></tr>').join('')+'</tbody></table></div>';
 grid.before(mode);
 const fmtTime=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
 function seconds(s){const a=s.split(':').map(Number);return a[0]*3600+a[1]*60+a[2];}
@@ -40,8 +40,10 @@ function prediction(timeSec,signal){
      period=150;
      lastOn=lastMorning+Math.floor((timeSec-lastMorning)/period)*period;
    }else{
-     // For signal 1 only, start 160s cycles from the final 150s onset.
-     const lastDay=lastMorning+Math.floor((eveningBoundary-lastMorning)/150)*150;
+     // Experimental evening phase correction: measured site signal lit ~1 s earlier
+     // than the dashboard around 20:59 KST on Nov 2. Keep 160 s period unchanged.
+     const eveningPhaseAdvanceSeconds=1;
+     const lastDay=lastMorning+Math.floor((eveningBoundary-lastMorning)/150)*150-eveningPhaseAdvanceSeconds;
      period=160;
      lastOn=lastDay+Math.floor((timeSec-lastDay)/period)*period;
    }
